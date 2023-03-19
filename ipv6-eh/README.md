@@ -1,4 +1,4 @@
-# PDM eBPF
+# Adding PDM extension header to IPv6 packets
 
 eBPF(TC-BPF) implementation of IPv6 PDM extension header([**RFC8250**](https://www.rfc-editor.org/rfc/rfc8250)).\
 The program has two sections, ingress and egress. These are attached to ingress and egress of the interface respectively, so that the respective sections are executed on ingress and egress of the interface.\
