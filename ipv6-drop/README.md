@@ -31,7 +31,7 @@
 
 ## Unloading the eBPF program
 
-1. Run the unload_bpf.sh script to unload the eBPF program,
+1. Run the remove_bpf.sh script to unload the eBPF program,
    ```
-   ./unload_bpf.sh <your_interface>
+   ./remove_bpf.sh <your_interface>
    ```
