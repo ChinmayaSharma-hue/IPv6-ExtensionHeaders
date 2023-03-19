@@ -17,9 +17,9 @@ sudo apt-get install -y build-essential clang llvm
 ## Repository Contents
 
 <!-- Link the readme.md file inside directories -->
-### [ipv6-drop](https://github.com/ChinmayaSharma-hue/IPv6-ExtensionHeaders/ipv6-drop)
+### [ipv6-drop](https://github.com/ChinmayaSharma-hue/IPv6-ExtensionHeaders/tree/main/ipv6-drop)
 A simple eBPF program that drops all IPv6 packets.
-### [ipv6-eh](https://github.com/ChinmayaSharma-hue/IPv6-ExtensionHeaders/ipv6-eh)
+### [ipv6-eh](https://github.com/ChinmayaSharma-hue/IPv6-ExtensionHeaders/tree/main/ipv6-eh)
 An eBPF program that inserts an extension header into all IPv6 packets.
 
 ## Tasks
