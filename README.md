@@ -34,3 +34,18 @@ An eBPF program that inserts an extension header into all IPv6 packets.
 #### Task 2: Insert an extension header into all IPv6 packets
 * Fill in the TODOs in the ipv6-eh program to insert an extension header (as described by [**RFC 8250**](https://datatracker.ietf.org/doc/rfc8250/)) into all IPv6 packets.
 * Check using wireshark that the extension header is being inserted into all IPv6 packets.
+
+#### Task 3: Try sending PDM enabled IPv6 packets and analyze
+* Atttach the compiled PDM program to your main infterface
+  ```
+  ./attach_pdm.sh <interface>
+  ```
+* Send IPv6 packets with PDM to a server which has enabled PDM.
+  ```
+  ping6 2001:19f0:5:3ce7:5400:04ff:fe31:1527
+  ```
+* Simulatneously capture packets on the interface using wireshark.
+  ```
+  sudo wireshark
+  ```
+* Analyze the PDM packets on wireshark

@@ -5,7 +5,9 @@
 #include <linux/icmp.h>
 #include <linux/ip.h>
 #include <linux/in.h>
+
 #include "bpf_helpers.h"
+#include "pdm_kern.h"
 
 #ifndef __section
 #define __section(x) __attribute__((section(x), used))
@@ -15,76 +17,6 @@
 
 #define DEBUG 1
 
-#ifdef DEBUG
-#define bpf_debug(fmt, ...)                        \
-    ({                                             \
-        char ____fmt[] = fmt;                      \
-        bpf_trace_printk(____fmt, sizeof(____fmt), \
-                         ##__VA_ARGS__);           \
-    })
-#endif
-
-struct ipv6hdr
-{
-    __u32 top;
-    __u16 payload_len;
-    __u8 nexthdr;
-    __u8 hop_limit;
-    __u64 saddr1;
-    __u64 saddr2;
-    __u64 daddr1;
-    __u64 daddr2;
-};
-
-    //    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //   |  Option Type  | Option Length |    ScaleDTLR  |     ScaleDTLS |
-    //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //   |   PSN This Packet             |  PSN Last Received            |
-    //   |-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //   |   Delta Time Last Received    |  Delta Time Last Sent         |
-    //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-struct ipv6_destopt_pdm
-{
-    __u8 type;      /* 0x0F */
-    __u8 length;    /* 10 bytes */
-    __u8 scaleDTLR; /* Scale Delta Time Last Recieved */
-    __u8 scaleDTLS; /* Scale Delta Time Last Sent */
-    __u16 PSNTP;    /* Packet Sequence Number This Packet */
-    __u16 PSNLR;    /* Packet Sequence Number Last Received */
-    __u16 DTLR;     /* Delta Time Last Received */
-    __u16 DTLS;     /* Delta Time Last Sent */
-    __u8 padn_opt;  /* PADN for Alignment: set to 1 */
-    __u8 padn_len;  /* PADN for Alignment: set to 0; signifies 2 bytes of padding */
-};
-
-
-
-struct dest_opt_header
-{
-    __u8 nexthdr;
-    __u8 hdrlen;
-};
-
-struct _5tuple
-{
-    __u64 saddr1;
-    __u64 saddr2;
-    __u64 daddr1;
-    __u64 daddr2;
-    __u16 sport;
-    __u16 dport;
-    __u8 protocol;
-};
-
-struct pdm_flow_details
-{
-    __u16 PSNLS; /* Packet Sequence Number Last Sent */
-    __u16 PSNLR; /* Packet Sequence Number Last Received */
-    __u64 TLR;   /* Time Last Received */
-    __u64 TLS;   /* Time Last Sent */
-};
 
 struct
 {
@@ -121,7 +53,7 @@ static __always_inline long int sdiv(long int x, long int y)
     return xneg != yneg ? -out : out;
 }
 
-// pdm time delta scale function
+// Function to calculate delta scale
 static __always_inline void pdm_time_delta_scale(long int time_diff, u16 *delta, u8 *scale)
 {
     int index = 0;
@@ -142,7 +74,7 @@ static __always_inline void pdm_time_delta_scale(long int time_diff, u16 *delta,
     *delta = base;
 }
 
-
+// Function to handle ingress PDM packets
 __section("pdm_ingress") int pdm_ingress_func(struct __sk_buff *skb)
 {
     void *data_end = (void *)(long)skb->data_end;
@@ -178,8 +110,6 @@ __section("pdm_ingress") int pdm_ingress_func(struct __sk_buff *skb)
     // Reading Destination address into Source address of 5tuple struct
     bpf_skb_load_bytes(skb, sizeof(*eth) + offsetof(struct ipv6hdr, daddr1), &key.saddr1, sizeof(key.saddr1) + sizeof(key.saddr2));
 
-    // bpf_skb_load_bytes(skb, sizeof(*eth) + sizeof(struct ipv6hdr) + sizeof(struct dest_opt_header) + sizeof(struct ipv6_destopt_pdm), &key.sport, sizeof(key.sport));
-    // bpf_skb_load_bytes(skb, sizeof(*eth) + sizeof(struct ipv6hdr) + sizeof(struct dest_opt_header) + sizeof(struct ipv6_destopt_pdm) + sizeof(key.sport), &key.dport, sizeof(key.dport));
     
     bpf_skb_load_bytes(skb, sizeof(*eth) + sizeof(struct ipv6hdr), &key.protocol, sizeof(key.protocol)); // To Do: Find a helper function to get the protocol
 
@@ -201,10 +131,7 @@ __section("pdm_ingress") int pdm_ingress_func(struct __sk_buff *skb)
 
 
 
-
-
-
-
+// Function to handle the PDM engress packets
 __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
 {
     void *data_end = (void *)(long)skb->data_end;
@@ -212,7 +139,7 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
     struct ethhdr *eth = data;
     struct ipv6hdr *ip6h;
 
-    // TODO: Perform basic checks on the packet
+    // TODO: Perform basic checks on the packet to make sure the packet is valid and not overflowing
     //              --- your code here ---
     // 
 
@@ -249,10 +176,8 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, sizeof(*eth) + offsetof(struct ipv6hdr, saddr1), &key.saddr1, sizeof(key.saddr1) + sizeof(key.saddr2));
     bpf_skb_load_bytes(skb, sizeof(*eth) + offsetof(struct ipv6hdr, daddr1), &key.daddr1, sizeof(key.daddr1) + sizeof(key.daddr2));
 
-    // bpf_skb_load_bytes(skb, sizeof(*eth) + sizeof(struct ipv6hdr) + sizeof(struct dest_opt_header) + sizeof(struct ipv6_destopt_pdm), &key.sport, sizeof(key.sport));
-    // bpf_skb_load_bytes(skb, sizeof(*eth) + sizeof(struct ipv6hdr) + sizeof(struct dest_opt_header) + sizeof(struct ipv6_destopt_pdm) + sizeof(key.sport), &key.dport, sizeof(key.dport));
     
-    key.protocol = dest_opt_header.nexthdr; // To do: find a helper function to find the protocol
+    key.protocol = dest_opt_header.nexthdr; 
 
     struct pdm_flow_details *pdm_flow_details_current = (struct pdm_flow_details *)bpf_map_lookup_elem(&pdm_state_1, &key);
 
@@ -279,7 +204,7 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
     pdm_flow_details_update.TLS = bpf_ktime_get_ns();
     bpf_map_update_elem(&pdm_state_1, &key, &pdm_flow_details_update, BPF_EXIST);
 
-    // Defining PDM - RFC 8250
+    // Compute all the required fields for PDM - RFC 8250
     struct ipv6_destopt_pdm pdm = {0};
     pdm.type = 0x0F;
     pdm.length = 10;
@@ -295,7 +220,7 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
         pdm.DTLS = htons(pdm.DTLS);
     }
 
-    // TODO: Add PDM to the packet
+    // TODO: Insert PDM to the packet
     //     --- your code here ---
     // 
 
