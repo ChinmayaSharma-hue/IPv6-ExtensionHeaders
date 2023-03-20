@@ -11,7 +11,9 @@ git clone https://github.com/ChinmayaSharma-hue/IPv6-ExtensionHeaders.git
 sudo apt-get update && sudo apt-get -y upgrade
 ```
 ```
-sudo apt-get install -y build-essential clang llvm
+sudo apt-get install -y build-essential clang llvm libelf-dev libpcap-dev \
+gcc-multilib linux-tools-$(uname -r) linux-headers-$(uname -r) linux-tools-common \
+linux-tools-generic tcpdump wireshark
 ```
 
 ## Repository Contents
