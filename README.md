@@ -8,7 +8,7 @@ git clone https://github.com/ChinmayaSharma-hue/IPv6-ExtensionHeaders.git
 ```
 ### Install dependencies
 ```
-sudo apt-get update && sudo apt-get -y upgrade
+sudo apt-get update
 ```
 ```
 sudo apt-get install -y build-essential clang llvm libelf-dev libpcap-dev \
