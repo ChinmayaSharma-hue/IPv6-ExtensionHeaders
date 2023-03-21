@@ -1,3 +1,6 @@
+#define default_action TC_ACT_SHOT
+
+#define DEBUG 1
 #ifdef DEBUG
 #define bpf_debug(fmt, ...)                        \
     ({                                             \
