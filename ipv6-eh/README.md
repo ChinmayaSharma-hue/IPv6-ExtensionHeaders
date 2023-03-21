@@ -7,7 +7,7 @@ The program has two sections, ingress and egress. These are attached to ingress 
 
 1. Compile and load the BPF program to a interface.
    ```
-   ./start.sh eno1
+   ./attach_pdm.sh eno1
    ```
 2. Start wireshark on eno1 interface
    ```
@@ -25,5 +25,5 @@ The program has two sections, ingress and egress. These are attached to ingress 
 
 1. Run the stop.sh script to unload the eBPF program,
    ```
-   ./stop.sh eno1
+   ./detach_pdm.sh eno1
    ```
