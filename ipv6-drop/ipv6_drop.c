@@ -66,15 +66,14 @@ __section("classifier") int cls_main(struct __sk_buff *skb)
     //     return TC_ACT_SHOT;
     // }
 
-    // Drop packets to 2001:19f0:5:3ce7:5400:04ff:fe31:1527
-    // Splitting into two parts and writing as 64 bit hex number: 0x200119F0 00053CE7 & 0x540004FF FE311527
-    // In reverse byte order 0x3CE7000519F02001 & 0x1527FE3104FF5400
+    // Drop packets to 2001:4f80:8000:c000::1000
+    // Splitting into 8 parts of 16 bits each: 0x2001 0x4f80 0x8000 0xc000 0x0 0x0 0x 0x1000
     if (ntohs(eth->h_proto) == ETH_P_IPV6)
     {
         // ipv6_cast = (struct ipv6hdr *)(data + sizeof(*eth));
         struct ipv6hdr ipv6_cast;
         bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ipv6_cast, sizeof(struct ipv6hdr));
-        __u16 daddr[8] = {0x2001, 0x19F0, 0x0005, 0x3CE7, 0x5400, 0x04FF, 0xFE31, 0x1527};
+        __u16 daddr[8] = {0x2001, 0x4f80, 0x8000, 0xc000, 0x0, 0x0, 0x0, 0x1000};
         int same_addr = 1;
         for(int i = 0; i<8; i++){
             if(ntohs(ipv6_cast.daddr[i]) != daddr[i])same_addr=0;
