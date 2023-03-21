@@ -18,7 +18,7 @@ CLANG_FLAGS = -I. -I$(KDIR)/arch/$(ARCH)/include \
 
 all: $(BIN)
 
-pdm_kern.o: pdm_kern.c
+pdm_kern.o: pdm_kern.c pdm_kern.h
 	$(CLANG) $(CLANG_FLAGS) -g -c $< -o - | \
 	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@
 

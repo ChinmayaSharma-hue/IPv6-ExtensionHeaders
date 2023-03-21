@@ -13,9 +13,7 @@
 #define __section(x) __attribute__((section(x), used))
 #endif
 
-#define default_action TC_ACT_SHOT
 
-#define DEBUG 1
 
 
 struct
@@ -119,10 +117,26 @@ __section("pdm_ingress") int pdm_ingress_func(struct __sk_buff *skb)
     struct pdm_flow_details *pdm_flow_details_current = (struct pdm_flow_details *)bpf_map_lookup_elem(&pdm_state_1, &key);
 
     struct pdm_flow_details pdm_flow_details_update = {0};
+    if (pdm_flow_details_current == NULL)
+    {
+        // If flow doesnt exist, create a new flow
+        struct pdm_flow_details pdm_flow_details_init = {0};
+        pdm_flow_details_init.PSNLS = bpf_get_prandom_u32() >> 16;
+        bpf_map_update_elem(&pdm_state_1, &key, &pdm_flow_details_init, BPF_NOEXIST);
+        pdm_flow_details_current = &pdm_flow_details_init;
+    }
 
-    // TODO: Updating the BPF map with the new values
-    //              --- your code here ---
-    // 
+    if (pdm_flow_details_current == NULL)
+    {
+        // Should never happen but exists for verifier
+        return default_action;
+    }
+
+    // Updating BPF map
+    pdm_flow_details_update.PSNLS = pdm_flow_details_current->PSNLS;
+    pdm_flow_details_update.PSNLR = ntohs(ingress_pdm_read.PSNTP);
+    pdm_flow_details_update.TLR = bpf_ktime_get_ns();
+    bpf_map_update_elem(&pdm_state_1, &key, &pdm_flow_details_update, BPF_EXIST);
 
     return TC_ACT_OK;
 }
@@ -138,10 +152,25 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
     void *data = (void *)(long)skb->data;
     struct ethhdr *eth = data;
     struct ipv6hdr *ip6h;
+    // Checking if eth headers are incomplete
+    if (data + sizeof(*eth) > data_end)
+    {
+        bpf_debug("Eth headers incomplete");
+        return default_action;
+    }
 
-    // TODO: Perform basic checks on the packet to make sure the packet is valid and not overflowing
-    //              --- your code here ---
-    // 
+    // Allowing IPV4 packets to passthrough without modification
+    if (ntohs(eth->h_proto) != ETH_P_IPV6)
+    {
+        return TC_ACT_OK;
+    }
+
+    // Checking if Ip headers are incomplete
+    if (data + sizeof(*eth) + sizeof(*ip6h) > data_end)
+    {
+        bpf_debug("IP headers incomplete");
+        return default_action;
+    }
 
     __u8 nexthdr = 60; // Dest options
 
@@ -161,7 +190,7 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
     payload_len = htons(payload_len);
 
     // Setting New Payload length
-    // bpf_skb_store_bytes(skb, payload_location, &payload_len, sizeof(payload_len), BPF_F_RECOMPUTE_CSUM);
+    bpf_skb_store_bytes(skb, payload_location, &payload_len, sizeof(payload_len), BPF_F_RECOMPUTE_CSUM);
 
     // Setting nexthdr to 60
     bpf_skb_store_bytes(skb, nexthdr_location, &nexthdr, sizeof(nexthdr), BPF_F_RECOMPUTE_CSUM);
@@ -216,13 +245,16 @@ __section("pdm_egress") int pdm_egress_func(struct __sk_buff *skb)
     {
         pdm_time_delta_scale(pdm_flow_details_update.TLS - pdm_flow_details_update.TLR, &pdm.DTLR, &pdm.scaleDTLR);
         pdm.DTLR = htons(pdm.DTLR);
-        pdm_time_delta_scale(pdm_flow_details_update.TLR - pdm_flow_details_current->TLS, &pdm.DTLS, &pdm.scaleDTLS); // Logic error, map is already updated and pointer is pointing to the updated map
+        pdm_time_delta_scale(pdm_flow_details_update.TLR - pdm_flow_details_current->TLS, &pdm.DTLS, &pdm.scaleDTLS);
         pdm.DTLS = htons(pdm.DTLS);
     }
+    // Storing Destination Options Header
+    __u32 exthdr_start = sizeof(*eth) + sizeof(struct ipv6hdr);
+    bpf_skb_store_bytes(skb, exthdr_start, &dest_opt_header, sizeof(dest_opt_header), BPF_F_RECOMPUTE_CSUM);
 
-    // TODO: Insert PDM to the packet
-    //     --- your code here ---
-    // 
+    // Storing PDM
+    bpf_skb_store_bytes(skb, exthdr_start + sizeof(dest_opt_header), &pdm, sizeof(pdm), BPF_F_RECOMPUTE_CSUM);
+
 
     return TC_ACT_OK;
 }
