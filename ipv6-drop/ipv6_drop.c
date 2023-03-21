@@ -32,11 +32,8 @@ struct ipv6hdr
     __be16 payload_len;
     __u8 nexthdr;
     __u8 hop_limit;
-    __u64 saddr1;
-    __u64 saddr2;
-    __u64 daddr1;
-    __u64 daddr2;
-    __u16 eh;
+    __u16 saddr[8];
+    __u16 daddr[8];
 };
 
 __section("classifier") int cls_main(struct __sk_buff *skb)
@@ -63,13 +60,32 @@ __section("classifier") int cls_main(struct __sk_buff *skb)
     }
 
     // Drop IPv6 packets
+    // if (ntohs(eth->h_proto) == ETH_P_IPV6)
+    // {
+    //     bpf_debug("Dropping IPv6 packet");
+    //     return TC_ACT_SHOT;
+    // }
+
+    // Drop packets to 2001:19f0:5:3ce7:5400:04ff:fe31:1527
+    // Splitting into two parts and writing as 64 bit hex number: 0x200119F0 00053CE7 & 0x540004FF FE311527
+    // In reverse byte order 0x3CE7000519F02001 & 0x1527FE3104FF5400
     if (ntohs(eth->h_proto) == ETH_P_IPV6)
     {
-        bpf_debug("Dropping IPv6 packet");
-        return TC_ACT_SHOT;
+        // ipv6_cast = (struct ipv6hdr *)(data + sizeof(*eth));
+        struct ipv6hdr ipv6_cast;
+        bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ipv6_cast, sizeof(struct ipv6hdr));
+        __u16 daddr[8] = {0x2001, 0x19F0, 0x0005, 0x3CE7, 0x5400, 0x04FF, 0xFE31, 0x1527};
+        int same_addr = 1;
+        for(int i = 0; i<8; i++){
+            if(ntohs(ipv6_cast.daddr[i]) != daddr[i])same_addr=0;
+        }
+        if (same_addr)
+        {
+            bpf_debug("Dropping IPv6 packet");
+            return TC_ACT_SHOT;
+        }
     }
 
-    // TODO: Drop IPv6 packets to a specific address
 
     return TC_ACT_OK;
 }
